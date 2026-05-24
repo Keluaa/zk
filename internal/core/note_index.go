@@ -30,11 +30,13 @@ type NoteIndex interface {
 	// Indexed returns the list of indexed note file metadata.
 	IndexedPaths() (<-chan paths.Metadata, error)
 	// Add indexes a new note.
-	Add(note Note) (NoteID, error)
+	Add(note Note, fixLinks bool) (NoteID, error)
 	// Update resets the metadata of an already indexed note.
 	Update(note Note) error
 	// Remove deletes a note from the index.
 	Remove(path string) error
+	// BatchUpdateLinks updates the links to existing notes
+	BatchUpdateLinks(ids []NoteID, paths []string) error
 
 	// Commit performs a set of operations atomically.
 	Commit(transaction func(idx NoteIndex) error) error
@@ -153,6 +155,9 @@ func (t *indexTask) execute(callback func(change paths.DiffChange)) (NoteIndexin
 		return stats, fmt.Errorf("finding indexed paths failed: %w", err)
 	}
 
+	addedNotes := make([]NoteID, 0)
+	addedPaths := make([]string, 0)
+
 	// FIXME: Use the FS?
 	count, err := paths.Diff(source, target, force, func(change paths.DiffChange) error {
 		callback(change)
@@ -164,7 +169,11 @@ func (t *indexTask) execute(callback func(change paths.DiffChange)) (NoteIndexin
 			stats.AddedCount += 1
 			note, err := t.parser.ParseNoteAt(absPath)
 			if note != nil {
-				_, err = t.index.Add(*note)
+				// Link update is done afterward on all added notes, for performance reasons
+				var id NoteID
+				id, err = t.index.Add(*note, false)
+				addedNotes = append(addedNotes, id)
+				addedPaths = append(addedPaths, note.Path)
 			}
 			t.logger.Err(err)
 
@@ -184,6 +193,14 @@ func (t *indexTask) execute(callback func(change paths.DiffChange)) (NoteIndexin
 
 		return nil
 	})
+	if err != nil {
+		return stats, fmt.Errorf("finding indexed paths failed: %w", err)
+	}
+
+	err = t.index.BatchUpdateLinks(addedNotes, addedPaths)
+	if err != nil {
+		return stats, fmt.Errorf("updating links failed: %w", err)
+	}
 
 	if t.verbose {
 		// The sort here is to make output reliable, therefore allowing to easily test output
