@@ -3,6 +3,8 @@ package core
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/bmatcuk/doublestar/v4"
@@ -183,8 +185,15 @@ func (t *indexTask) execute(callback func(change paths.DiffChange)) (NoteIndexin
 		return nil
 	})
 
-	for _, ignored := range ignoredFiles {
-		print("- ignored " + ignored.Path + ": " + ignored.Reason)
+	if t.verbose {
+		// The sort here is to make output reliable, therefore allowing to easily test output
+		// no matter the order in which ParallelWalk parsed the files
+		slices.SortFunc(ignoredFiles, func(a, b IgnoredFile) int {
+			return strings.Compare(a.Path, b.Path)
+		})
+		for _, ignored := range ignoredFiles {
+			print("- ignored " + ignored.Path + ": " + ignored.Reason)
+		}
 	}
 
 	stats.SourceCount = count
