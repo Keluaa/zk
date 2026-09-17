@@ -62,13 +62,17 @@ func (cmd *Config) Run(container *cli.Container) error {
 		}
 	}
 
-	var objects = make(map[string]string)
+	var objects = make(map[string]any)
 
 	switch cmd.List {
 	case "filters":
-		objects = container.Config.Filters
+		for k, v := range container.Config.Filters {
+			objects[k] = v
+		}
 	case "aliases":
-		objects = container.Config.Aliases
+		for k, v := range container.Config.Aliases {
+			objects[k] = v
+		}
 	case "extras":
 		objects = container.Config.Extra
 	default:

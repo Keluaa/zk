@@ -98,7 +98,7 @@ type NewNoteOpts struct {
 	// Path to a custom template used to render the note.
 	Template opt.String
 	// Extra variables passed to the templates.
-	Extra map[string]string
+	Extra map[string]any
 	// Creation date provided to the templates.
 	Date time.Time
 	// Don't save the generated note on the file system.
@@ -132,7 +132,7 @@ func (n *Notebook) NewNote(opts NewNoteOpts) (*Note, error) {
 		return nil, fmt.Errorf("new note: %w", err)
 	}
 
-	extra := config.Extra
+	var extra map[string]any = config.Extra
 	maps.Copy(extra, opts.Extra)
 
 	templates, err := n.templateLoaderFactory(config.Note.Lang)
